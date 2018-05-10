@@ -7,8 +7,8 @@ First compute the score of each weak, average by total dates.
 
 import pandas
 import numpy
-from tBrain_kfold import model_naiveavg
-from tBrain_kfold import model_naivediff
+from tBrain_kfold import model_naiveavg, model_naivediff, model_naivenews
+
 
 def days_to_date(df, col_days='date', t0=pandas.to_datetime('20130102', format='%Y%m%d')):
     df[col_days] = pandas.to_timedelta(df[col_days], unit='D')+t0
@@ -30,7 +30,7 @@ def weekday_to_weight(df, week_weight, col_date='date'):
     return None
 
 def price_eval(df_model, df_etf, col_date='date', col_price='price', week_weight=[0.1, 0.15, 0.2, 0.25, 0.3, 0, 0]):
-    weight =  df_model[[col_date, col_price]].copy()
+    weight = pandas.DataFrame({'date': df_model['date'].values})
     date_to_weekday(weight)
     weekday_to_weight(weight, week_weight=week_weight, col_date=col_date)
 
@@ -41,20 +41,20 @@ def price_eval(df_model, df_etf, col_date='date', col_price='price', week_weight
     return weight['date']*eval
 
 def trend_eval(df_model, df_etf, col_date='date', col_price='price', week_weight=[0.1, 0.15, 0.2, 0.25, 0.3, 0, 0]):
-    weight =  df_model[[col_date, col_price]].copy()
+    weight = pandas.DataFrame({'date': df_model['date'].values})
     date_to_weekday(weight)
     weekday_to_weight(weight, week_weight=week_weight, col_date=col_date)
 
     # score series w/o weighted by weekdays
-    eval = pandas.Series(numpy.where(df_model['price']==df_etf['price'], 1, 0))
+    eval = pandas.Series(numpy.where(df_model['price'] == df_etf['price'], 1, 0))
 
     # return weighted score
-    return weight['date']*eval
+    return eval*weight['date']
 
 def main_naiveavg():
 
     import os
-    path = '/archive/TBrain_ETF/taetf_t-series/'
+    path = '/archive/TBrain_ETF/taetf_t-series_0427/'
     files=os.listdir(path)
 
     for file in files:
@@ -72,7 +72,7 @@ def main_naiveavg():
 
 def main_naivediff():
     import os
-    path = '/archive/TBrain_ETF/taetf_t-series/'
+    path = '/archive/TBrain_ETF/taetf_t-series_0427/'
     files=os.listdir(path)
 
     for file in files:
@@ -91,5 +91,36 @@ def main_naivediff():
             week_weight = [1, 1, 1, 1, 1, 1, 1]
             print(trend_eval(df_model, df_etf, week_weight=week_weight).sum()/df_etf.shape[0])
 
+def main_naivenews():
+    import os
+    path = '/archive/TBrain_ETF/taetf_t-series_0427/'
+    files = os.listdir(path)
+
+    for file in files:
+
+        if file.endswith('.csv'):
+            print(file)
+            code = int(file.strip('taetf-code.csv'))
+
+            df_etf = pandas.read_csv(path + file)
+            df_etf = df_etf[['date','price']]
+            df_model = model_naivenews(df_etf, df_etf.shape[0] / 7, etf_code=code)
+            df_etf['price'] = numpy.where(df_etf['price'].diff(periods=1) > 0, 1, 0)
+
+            date_range = (729, 1941)
+
+            df_etf = df_etf[(df_etf['date'] >= date_range[0]) & (df_etf['date'] <= date_range[1])]
+            df_model = df_model[(df_model['date'] >= date_range[0]) & (df_model['date'] <= date_range[1])]
+
+            days_to_date(df_model)
+            days_to_date(df_etf)
+
+            week_weight = [1, 1, 1, 1, 1, 1, 1]
+            try:
+                print(trend_eval(df_model, df_etf, week_weight=week_weight).sum()/df_etf.shape[0])
+            except ValueError as err:
+                print(err)
+
+
 if __name__ == "__main__":
-    main_naivediff()
+    main_naivenews()
