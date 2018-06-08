@@ -3,10 +3,12 @@ Tools for chain forward prediction of a time series.
 """
 import numpy
 import pandas
+import matplotlib.pyplot as plt
 
-# Split time series into k-fold
-# Return the sorted indices of each fold
+
 def kfold_bytime(tseries, k):
+    """Split series into k-fold with equal length on value(not number of data).
+    Return the sroted indices of each fold."""
 
     # Get range of t, and split:
     foldsize = (tseries.max()-tseries.min())/k
@@ -28,69 +30,91 @@ def kfold_bytime(tseries, k):
 
     return kfold_indices
 
-# A simple k-fold averaging model to predict the price.
-def model_naiveavg(df,k):
+
+def model_naiveavg(df, k):
+    """Simple k-fold averaging model to predict the price."""
 
     kfold_indices = kfold_bytime(df['date'].values, k)
-    df_predict = pandas.DataFrame(0, index=range(df.shape[0]), columns=['date','price'])
+    df_predict = pandas.DataFrame(0,
+                                  index=range(df.shape[0]),
+                                  columns=['date', 'price']
+                                  )
 
     for i in range(len(kfold_indices)-1):
-        df_predict.loc[kfold_indices[i+1], ['date']] = df.loc[kfold_indices[i+1], ['date']].values
-        df_predict.loc[kfold_indices[i+1], ['price']] = df.loc[kfold_indices[i], ['price']].values.mean()
+        df_predict.loc[kfold_indices[i+1], ['date']] \
+            = df.loc[kfold_indices[i+1], ['date']].values
+        df_predict.loc[kfold_indices[i+1], ['price']] \
+            = df.loc[kfold_indices[i], ['price']].values.mean()
 
     # remove the 1st fold
     df_predict = df_predict.drop(kfold_indices[0])
     return df_predict
 
-# A simple k-fold difference model to predict the trend.
+
 def model_naivediff(df, k):
+    """A simple k-fold difference model to predict the trend."""
 
     kfold_indices = kfold_bytime(df['date'].values, k)
-    df_predict = pandas.DataFrame(0, index=range(df.shape[0]), columns=['date', 'price'])
+    df_predict = pandas.DataFrame(0,
+                                  index=range(df.shape[0]),
+                                  columns=['date', 'price']
+                                  )
 
     for i in range(len(kfold_indices)-1):
         val = df.loc[kfold_indices[i], ['price']].values
         if val.size:
             val = val[-1] - val[0]
 
-            df_predict.loc[kfold_indices[i + 1], ['date']] = df.loc[kfold_indices[i + 1], ['date']].values
-            df_predict.loc[kfold_indices[i + 1], ['price']] = int(val>0)
+            df_predict.loc[kfold_indices[i + 1], ['date']]\
+                = df.loc[kfold_indices[i + 1], ['date']].values
+            df_predict.loc[kfold_indices[i + 1], ['price']]\
+                = int(val > 0)
 
     # remove the 1st fold
     df_predict = df_predict.drop(kfold_indices[0])
     return df_predict
 
 
-# Used by model_naivenews to get the polarity within certain range of date.
-class news_polarity():
+class news_polarity:
+    """Used by model_naivenews to get the polarity within range of date."""
 
     def __init__(self, news, shares_map):
-        self.news=pandas.read_csv(news)[['date','code','polarity']]
-        self.shares_map= pandas.read_csv(shares_map)
+        self.news = pandas.read_csv(news)[['date', 'code', 'polarity']]
+        self.shares_map = pandas.read_csv(shares_map)
 
     def get_polarity(self, etf_code, date_range):
-        shares = self.shares_map[self.shares_map['etf_id']==etf_code]
+        shares = self.shares_map[self.shares_map['etf_id'] == etf_code]
 
         # limit news range
-        news = self.news[(self.news['date'] >= date_range[0]) & (self.news['date'] <= date_range[1])]
+        news = self.news[(self.news['date'] >= date_range[0]) &
+                         (self.news['date'] <= date_range[1])
+                         ]
         news = news[news['code'].isin(shares.stock_id.values)]
 
         # return the total polarity
-        news['weight'] = news.code.apply(lambda code: shares[shares['stock_id']==code].percent.item())/100
+        news['weight'] = 0.01 * news.code.apply(
+                lambda code: shares[shares['stock_id'] == code].percent.item()
+                )
         news['polarity'] = news['polarity']*news['weight']
 
         return news['polarity'].sum()
 
-# A simple k-fold model considering the title of news from TEJ database.
+
 def model_naivenews(df, k, etf_code, threshold=0.5):
-    news = '/archive/TBrain_ETF/NewsAnalyze/tb_news_polarized.csv'
-    shares_map = '/archive/TBrain_ETF/Shares_to_ETF/SharesToEtfMap_on20180331_Tej.csv'
+    """A simple k-fold model considering the title of news from TEJ DB."""
+
+    path = '/archive/TBrain_ETF'
+    news = path + '/NewsAnalyze/tb_news_polarized.csv'
+    shares_map = path + 'Shares_to_ETF/SharesToEtfMap_on20180331_Tej.csv'
 
     news = news_polarity(news=news, shares_map=shares_map)
 
     # Combine news with naivediff
     kfold_indices = kfold_bytime(df['date'].values, k)
-    df_predict = pandas.DataFrame(0, index=range(df.shape[0]), columns=['date', 'price'])
+    df_predict = pandas.DataFrame(0,
+                                  index=range(df.shape[0]),
+                                  columns=['date', 'price']
+                                  )
 
     for i in range(len(kfold_indices)-1):
         val = df.loc[kfold_indices[i], ['price']].values
@@ -100,15 +124,17 @@ def model_naivenews(df, k, etf_code, threshold=0.5):
 
             polar = news.get_polarity(etf_code, (int(days[0]), int(days[-1])))
             if polar:
-                df_predict.loc[kfold_indices[i + 1], ['price']] = int(polar > threshold)
+                df_predict.loc[kfold_indices[i + 1], ['price']] \
+                    = int(polar > threshold)
             else:
-                df_predict.loc[kfold_indices[i + 1], ['price']] = int( (val[-1] - val[0])>0 )
+                df_predict.loc[kfold_indices[i + 1], ['price']] \
+                    = int((val[-1] - val[0]) > 0)
 
     # remove the 1st fold
     df_predict = df_predict.drop(kfold_indices[0])
     return df_predict
 
-import matplotlib.pyplot as plt
+
 def main_naiveavg():
 
     df = pandas.read_csv('/archive/TBrain_ETF/taetf_t-series/' + 'taetf-code50.csv')
@@ -122,6 +148,7 @@ def main_naiveavg():
     plt.ylabel('price')
     plt.legend()
     plt.show()
+
 
 def main_naivediff():
 
@@ -139,6 +166,7 @@ def main_naivediff():
     plt.ylabel('price')
     plt.legend()
     plt.show()
+
 
 def main_naivenews():
 
@@ -160,5 +188,5 @@ def main_naivenews():
     plt.show()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     main_naivenews()

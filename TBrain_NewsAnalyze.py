@@ -1,22 +1,26 @@
 """
 Usage: Analyze the news from TEJ database.
-
 """
+
 import numpy
 import pandas
 
+
 def positive_wordbag():
-    word = ['獲利穩', '回穩', '回溫', '看穩', '高檔', '走強', '增長', '看增', '倍增','季增', '月增',
-            '年增','揚升', '新高', '成長', '看好', '看漲', '不俗','看旺', '賺']
+    word = ['獲利穩', '回穩', '回溫', '看穩', '高檔', '走強', '增長', '看增',
+            '倍增','季增', '月增', '年增','揚升', '新高', '成長', '看好',
+            '看漲', '不俗','看旺', '賺']
     eval = ['優於大盤', '買進', '逢低買進', '強力買進', '加碼']
 
     return {'word':word, 'eval':eval}
 
+
 def negative_wordbag():
-    word = ['連虧', '衰退', '季減', '年減','月減', '低迷', '新低', '虧損', '減弱','疲弱','走弱',
-            '降溫', '大減', '熄火']
+    word = ['連虧', '衰退', '季減', '年減','月減', '低迷', '新低', '虧損', '減弱',
+            '疲弱','走弱', '降溫', '大減', '熄火']
     eval = ['劣於大盤', '賣出', '減碼']
     return {'word':word, 'eval':eval}
+
 
 def polarity(news):
     positive = positive_wordbag()
@@ -49,7 +53,11 @@ def main():
 
     # determine the polarity of news:
     df['polarity'] = df['title'].apply(polarity)
-    df.to_csv('/archive/TBrain_ETF/tb_news_polarized.csv', index=False, encoding='utf-8')
+    df.to_csv('/archive/TBrain_ETF/tb_news_polarized.csv',
+              index=False,
+              encoding='utf-8'
+              )
+
 
 def news_by_etf():
     import os
@@ -76,5 +84,6 @@ def news_by_etf():
 
             df.to_csv('/archive/TBrain_ETF/NewsAnalyze/taetf-code'+str(code)+'_withNews.csv', index=False)
 
-if __name__=='__main__':
+
+if __name__ == '__main__':
     news_by_etf()
