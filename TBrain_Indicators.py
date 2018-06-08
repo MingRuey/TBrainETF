@@ -39,8 +39,7 @@ def rsi(series, period=10):
     dw = numpy.where(diff < 0, diff, diff - diff)
     # diff - diff is a small trick to keep the NaN value in diff
 
-    rsi = 100 - 100 / (1 + ma(up, period=period) / ma(dw, period=period))
-    return rsi
+    return 100 - 100 / (1 + ma(up, period=period) / ma(dw, period=period))
 
 
 def exp_ma(series, n):
@@ -86,7 +85,7 @@ def stochastic_k(df, *,
 
 def stochastic_d(df, stochastic_k_col='stochastic_k', period=10):
     """Inplace add Stochastic D% of the series from stochastic_k column"""
-    df['stochastic_d'] = ma(df[stochastic_k], period=period)
+    df['stochastic_d'] = ma(df[stochastic_k_col], period=period)
     return None
 
 
@@ -121,7 +120,7 @@ def cci(df, *,
         period=10,
         col_price='price',
         col_low='low',
-        col_high='high',
+        col_high='high'
         ):
     """Inplace add Commodity Channel Index to the DataFrame"""
     tp = (df[col_high] + df[col_low] + df[col_price])/3  # typical price
