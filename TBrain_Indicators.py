@@ -131,5 +131,5 @@ def cci(df, *,
     return None
 
 
-s = pandas.Series([i for i in range(10)])
-print(s.cumsum())
+if __name__ == '__main__':
+    pass
