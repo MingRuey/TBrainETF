@@ -13,7 +13,7 @@ import pandas
 
 def ma(series, period=10, weight=None):
     """Return the moving average of the series,
-       with first *aperiod rows become NaN"""
+       with first *period rows become NaN"""
     if not weight:
         return series.rolling(window=period).mean()
     else:
@@ -33,10 +33,16 @@ def momentum(series, period=10):
 def rsi(series, period=10):
     """Return the relative strength index"""
 
-    # get upward change U and downward change D, wiki: Relative strength index
+    # get upward change UP and downward change DW, wiki: Relative strength index
     diff = series.diff(periods=1)
-    up = numpy.where(diff > 0, diff, diff - diff)
-    dw = numpy.where(diff < 0, diff, diff - diff)
+    up = pandas.Series(
+        numpy.where(diff > 0, diff, diff - diff),
+        index=series.index
+        )
+    dw = pandas.Series(
+        numpy.where(diff < 0, -1 * diff, diff - diff),
+        index=series.index
+        )
     # diff - diff is a small trick to keep the NaN value in diff
 
     return 100 - 100 / (1 + ma(up, period=period) / ma(dw, period=period))
@@ -61,7 +67,7 @@ def macd(series):
     return exp_ma(exp_ma(series, 12) - exp_ma(series, 26), 9)
 
 
-def lowst_low_highest_high(low_series, high_series, period=10):
+def lowest_low_highest_high(low_series, high_series, period=10):
     """Reutrn the min-value series of *low_series withn the range of *period,
         and also the max-value series of *high_series."""
     ll = pandas.Series(float('inf'), index=low_series.index)
@@ -74,11 +80,11 @@ def lowst_low_highest_high(low_series, high_series, period=10):
 
 def stochastic_k(df, *,
                  col_price='price',
-                 col_low='low',
-                 col_high='high',
+                 col_low='min',
+                 col_high='max',
                  period=10):
     """Inplace add the Stochastic K% to the DataFrame"""
-    ll, hh = lowst_low_highest_high(df[col_low], df[col_high], period=period)
+    ll, hh = lowest_low_highest_high(df[col_low], df[col_high], period=period)
     df['stochastic_k'] = df[col_price] - ll / (hh - ll)
     return None
 
@@ -91,26 +97,27 @@ def stochastic_d(df, stochastic_k_col='stochastic_k', period=10):
 
 def williams_r(df, *,
                col_price='price',
-               col_low='low',
-               col_high='high',
+               col_low='min',
+               col_high='max',
                period=10):
     """Inplace add the Williams %R series to the DataFrame"""
-    ll, hh = lowst_low_highest_high(df[col_low], df[col_high], period=period)
+    ll, hh = lowest_low_highest_high(df[col_low], df[col_high], period=period)
     df['williams_r'] = (hh - df[col_price]) / (hh - ll)
     return None
 
 
 def chaikin(df, *,
             col_price='price',
-            col_low='low',
-            col_high='high',
-            col_vol='qunt'
+            col_low='min',
+            col_high='max',
+            col_vol='quant'
             ):
     """Inplace add the Chaikin Oscillator to the DataFrame"""
 
     # the Accumulation Distribution Line
     multiplier = (2*df[col_price] - df[col_low] - df[col_high])\
         / (df[col_high] - df[col_low])
+    multiplier.fillna(0, inplace=True)  # where df[col_high] = df[col_low]
     money_flow = (df[col_vol] * multiplier).cumsum(skipna=True)
     df['chaikin'] = exp_ma(money_flow, 3) - exp_ma(money_flow, 10)
     return None
@@ -119,8 +126,8 @@ def chaikin(df, *,
 def cci(df, *,
         period=10,
         col_price='price',
-        col_low='low',
-        col_high='high'
+        col_low='min',
+        col_high='max'
         ):
     """Inplace add Commodity Channel Index to the DataFrame"""
     tp = (df[col_high] + df[col_low] + df[col_price])/3  # typical price
